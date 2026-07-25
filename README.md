@@ -1,70 +1,66 @@
-# DINOv3 → YOLO11m 知识蒸馏 (25类遥感目标检测)
+# DINOv3 -> YOLO11m Knowledge Distillation (25-Class Remote Sensing)
 
-将 DINOv3 ViT-L 的知识蒸馏到 YOLO11m，提升细粒度遥感军事目标检测。
+Distill DINOv3 ViT-L into YOLO11m for fine-grained military aircraft detection.
 
 **GPU**: RTX 3090/4090 24GB | **PyTorch**: 2.1+ | **Python**: 3.10+
 
 ---
 
-## 环境要求
+## Requirements
 
-| 组件 | 要求 |
+| Item | Spec |
 |------|------|
 | GPU | RTX 3090/4090 24GB |
 | PyTorch | 2.1+ (CUDA 11.8/12.x) |
 | Python | 3.10+ |
-| 系统 | Ubuntu 20.04/22.04 |
-| 硬盘 | ~10GB（含数据集和权重） |
+| OS | Ubuntu 20.04/22.04 |
+| Disk | ~10GB (with dataset & weights) |
 
 ---
 
-## 快速开始
+## Quick Start
 
-### 1. 克隆仓库
+### 1. Clone
 
-`ash
+```bash
 git clone https://github.com/zhengzhezhao057/dinov3-yolo-distill.git
 cd dinov3-yolo-distill
-`
+```
 
-### 2. 安装依赖
+### 2. Install Dependencies
 
-`ash
-# 基础包
+```bash
 pip install ultralytics opencv-python-headless tqdm pyyaml numpy timm -q
-
-# DINOv3 源码
 git clone --depth 1 https://github.com/facebookresearch/dinov3.git dinov3_repo
-`
+```
 
-### 3. 下载权重
+### 3. Download Weights
 
-`ash
+```bash
 mkdir -p weights
 
 # YOLO11m (40MB)
 wget -O weights/yolo11m.pt https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11m.pt
 
-# DINOv3 ViT-L (1.2GB) — 需要先登录 huggingface.co 申请访问
+# DINOv3 ViT-L (1.2GB) - requires HuggingFace login + access approval
 pip install huggingface_hub -q
 hf download facebook/dinov3-vitl16-pretrain-sat493m --local-dir weights/
-`
+```
 
-> ⚠️ 如果 HuggingFace 下载失败，从本地上传：
-> scp -P <端口> dinov3_vitl16_pretrain_sat493m-eadcf0ff.pth root@<IP>:/root/dinov3-yolo-distill/weights/
+> If HuggingFace fails, upload manually: `scp -P <port> <local.pth> root@<ip>:/root/dinov3-yolo-distill/weights/`
 
-### 4. 准备数据集
+### 4. Prepare Dataset
 
-目录结构：
-`
+Directory structure:
+```
 data/
-├── dataset.yaml
-├── images/train/    # .jpg/.png
-└── labels/train/    # YOLO格式 .txt
-`
+  dataset.yaml
+  images/train/    (*.jpg / *.png)
+  labels/train/    (YOLO format *.txt)
+```
 
 **dataset.yaml**:
-`yaml
+```yaml
 path: ./data
 train: images/train
 nc: 25
@@ -72,115 +68,117 @@ names: ["HM","LQS","QHS","MS","A1_SU-35","A2_C-130","A3_C-17","A4_C-5",
         "A5_F-16","A6_TU-160","A7_E-3","A8_B-52","A9_P-3C","A10_B-1B",
         "A11_E-8","A12_TU-22","A13_F-15","A14_KC-135","A15_F-22",
         "A16_FA-18","A17_TU-95","A18_KC-10","A19_SU-34","A20_SU-24","FSC"]
-`
+```
 
-上传方式（推荐压缩后上传）：
-`powershell
-# 本地压缩 (Windows PowerShell)
-cd E:\deeplearning\split_dataset\split_dataset
-tar -czf E:\deeplearning\split_dataset\dataset.tar.gz images labels dataset.yaml
+Upload (compress then SCP):
+```powershell
+# Local: compress dataset
+cd your_dataset_folder
+tar -czf dataset.tar.gz images labels dataset.yaml
 
-# SCP 上传
-scp -P <端口> E:\deeplearning\split_dataset\dataset.tar.gz root@<IP>:/root/dinov3-yolo-distill/data/
-`
+# Upload to server
+scp -P <port> dataset.tar.gz root@<ip>:/root/dinov3-yolo-distill/data/
 
-服务器解压：
-`ash
+# Server: extract
 cd /root/dinov3-yolo-distill/data && tar -xzf dataset.tar.gz
-`
+```
 
-### 5. 验证
+### 5. Verify
 
-`ash
+```bash
 python scripts/verify.py
-`
+```
 
-看到 ALL OK! 即可开始训练。
+Expected: `ALL OK!`
 
 ---
 
-## 训练流程
+## Training Pipeline
 
-| 步骤 | 命令 | 时间 | 说明 |
-|------|------|------|------|
-| ① | python scripts/train_teacher.py | ~10h | 训练教师 (100 epochs) |
-| ② | python scripts/extract_signals.py | ~20min | 提取教师信号 |
-| ③ | python scripts/train_distill.py | ~4h | 蒸馏 YOLO11m (50 epochs) |
-| ④ | python scripts/train_finetune.py | ~1h | 关闭蒸馏微调 (10 epochs) |
+| Step | Command | Time | Description |
+|------|---------|------|-------------|
+| 1 | `python scripts/train_teacher.py` | ~10h | Train DINOv3 teacher (100 epochs) |
+| 2 | `python scripts/extract_signals.py` | ~20min | Extract teacher signals |
+| 3 | `python scripts/train_distill.py` | ~4h | Distill to YOLO11m (50 epochs) |
+| 4 | `python scripts/train_finetune.py` | ~1h | Fine-tune without distillation (10 epochs) |
 
-长时间训练建议 
-ohup：
-`ash
+For long runs use `nohup`:
+```bash
 nohup python scripts/train_teacher.py > logs/teacher.log 2>&1 &
 tail -f logs/teacher.log
-`
+```
 
 ---
 
-## 蒸馏方案
+## Distillation Method
 
-`
-教师 (DINOv3 ViT-L 303M)                学生 (YOLO11m 20M)
-┌──────────────────────────┐           ┌──────────────────┐
-│ ViT-L → ViTBackbone      │    MSE    │ YOLO Backbone    │
-│         → LightFPN       │←─────────→│ → YOLO Neck      │
-│         → PredHead  Cls  │    KL     │ → YOLO Head      │
-└──────────────────────────┘←─────────→└──────────────────┘
-                                      L = L_det + α·MSE + β·KL
+```
+Teacher (DINOv3 ViT-L 303M)              Student (YOLO11m 20M)
++---------------------------+           +-------------------+
+| ViT-L -> ViTBackbone      |    MSE    | YOLO Backbone     |
+|        -> LightFPN        |<=========>| -> YOLO Neck      |
+|        -> PredHead / Cls  |    KL     | -> YOLO Head      |
++---------------------------+<=========>+-------------------+
+                                     L = L_det + a*MSE + b*KL
 
-α(t): 0.5→0.1   β(t): 0.3→0.7   KL T=3.0
-`
+a(t): 0.5 -> 0.1   (feature alignment, early focus)
+b(t): 0.3 -> 0.7   (classification KD, late focus)
+KL temperature: T=3.0
+```
 
-### 教师训练策略
+### Teacher Training Schedule
 
-| 阶段 | Epoch | 策略 | LR |
-|------|-------|------|-----|
-| Phase 1 | 1-40 | 冻结 ViT，训练 Neck+Head | 1e-3 |
-| Phase 2 | 41-70 | 解冻最后6个block | 3e-4/1e-4 |
-| Phase 3 | 71-100 | 全部解冻 | 1e-4 |
+| Phase | Epochs | Strategy | LR |
+|-------|--------|----------|-----|
+| 1 | 1-40 | Freeze ViT, train Neck+Head | 1e-3 |
+| 2 | 41-70 | Unfreeze last 6 ViT blocks | 3e-4 / 1e-4 |
+| 3 | 71-100 | Unfreeze all | 1e-4 |
 
----
-
-## 配置说明
-
-所有路径集中在 config.py。更换目录只需设置环境变量：
-
-`ash
-export DISTILL_HOME=/你的自定义路径
-`
-
-默认就是 repo 所在目录。
+EMA (0.9995), multi-scale [480-800], CosineWarmRestarts, Label Smoothing (0.05)
 
 ---
 
-## 常见问题
+## Configuration
 
-- **HuggingFace 下载失败？** → 登录申请权限，或 SCP 本地上传
-- **OOM？** → 减小 BATCH，增大 ACCUM 保持乘积不变
-- **No module named 'dinov3'？** → 确认 dinov3_repo/ 已克隆
-- **多服务器迁移？** → clone 仓库 + 上传 weights/ 和 data/ 即可
+All paths in `config.py`. To use a custom root directory:
+
+```bash
+export DISTILL_HOME=/your/custom/path
+```
+
+Default: the repo directory itself.
 
 ---
 
-## 项目结构
+## FAQ
 
-`
+- **HuggingFace download fails?** Login to huggingface.co, request access, or SCP upload from local
+- **OOM?** Reduce `BATCH` in config.py, increase `ACCUM` to keep effective batch=32
+- **`No module named 'dinov3'`?** Ensure `dinov3_repo/` is cloned in the right place
+- **Multi-server migration?** Clone repo, upload `weights/` and `data/`, done
+
+---
+
+## Project Structure
+
+```
 dinov3-yolo-distill/
-├── config.py              # 全局路径和超参
-├── requirements.txt       # Python 依赖
-├── README.md
-├── scripts/
-│   ├── verify.py          # 环境验证
-│   ├── train_teacher.py   # ① 教师训练
-│   ├── extract_signals.py # ② 提取信号
-│   ├── train_distill.py   # ③ 蒸馏
-│   └── train_finetune.py  # ④ 微调
-├── dinov3_repo/           # DINOv3 源码 (git clone 生成)
-├── weights/               # 权重 (手动下载)
-├── data/                  # 数据集 (手动准备)
-├── features/              # 教师信号 (自动生成)
-└── runs/                  # 训练输出 (自动生成)
-`
+  config.py                   Global paths & hyperparams
+  requirements.txt            Python dependencies
+  dataset.yaml.example        Copy to data/dataset.yaml
+  README.md
+  scripts/
+    verify.py                 Environment check
+    train_teacher.py          Step 1: Teacher training
+    extract_signals.py        Step 2: Signal extraction
+    train_distill.py          Step 3: Distillation
+    train_finetune.py         Step 4: Fine-tuning
+  dinov3_repo/                DINOv3 source (git cloned)
+  weights/                    Model weights (manual download)
+  data/                       Dataset (manual upload)
+  features/                   Teacher signals (auto-generated)
+  runs/                       Training outputs (auto-generated)
+```
 
 ## License
 
