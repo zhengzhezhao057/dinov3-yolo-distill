@@ -13,7 +13,7 @@ print(f"\n[1] PyTorch {torch.__version__}  CUDA={torch.cuda.is_available()}")
 if torch.cuda.is_available():
     print(f"    GPU: {torch.cuda.get_device_name(0)}")
 
-for pkg, name in [("ultralytics","ultralytics"),("cv2","opencv"),("yaml","pyyaml")]:
+for pkg, name in [("ultralytics","ultralytics"),(("cv2","cv2")),(("yaml","yaml"))]:
     try: __import__(name); print(f"[2] {pkg}: OK")
     except: errors.append(f"pip install {pkg}")
 
