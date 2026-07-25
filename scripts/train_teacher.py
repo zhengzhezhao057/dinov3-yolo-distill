@@ -8,8 +8,8 @@ import time, cv2, yaml, numpy as np, random, math
 from pathlib import Path
 from tqdm import tqdm
 
-BASE = "/root/autodl-tmp"
-sys.path.insert(0, f"{BASE}/dinov3_repo")
+import sys; sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); from config import *
+sys.path.insert(0, DINOV3_REPO)
 from dinov3.models.vision_transformer import DinoVisionTransformer
 
 DEVICE = "cuda"; IMGSZ = 640; PATCH_SIZE = 16; FEAT_DIM = 1024
@@ -31,7 +31,7 @@ vit = DinoVisionTransformer(img_size=IMGSZ, patch_size=PATCH_SIZE, in_chans=3,
     drop_path_rate=0.0, layerscale_init=1e-5, norm_layer="layernormbf16",
     ffn_layer="mlp", ffn_bias=True, proj_bias=True, n_storage_tokens=4,
     mask_k_bias=True, untie_global_and_local_cls_norm=True)
-sd = torch.load(f"{BASE}/dinov3_vitl16_pretrain_sat493m-eadcf0ff.pth", map_location="cpu", weights_only=True)
+sd = torch.load(VIT_WEIGHTS, map_location="cpu", weights_only=True)
 vit.load_state_dict(sd, strict=True); del sd
 print(f"  ViT-L: {sum(p.numel() for p in vit.parameters())/1e6:.1f}M params")
 
@@ -275,9 +275,9 @@ def compute_det_loss(preds, batch, teacher):
     return box_l + cls_l, (box_l.item(), cls_l.item(), 0.0)
 
 # ---- Data ----
-with open(f"{BASE}/split_dataset/dataset.yaml") as f: cfg = yaml.safe_load(f)
-img_dir = cfg["path"] + "/images/train"
-lab_dir = cfg["path"] + "/labels/train"
+with open(DATASET_YAML) as f: cfg = yaml.safe_load(f)
+img_dir = cfg.get("path", DATASET_DIR) + "/images/train"
+lab_dir = cfg.get("path", DATASET_DIR) + "/labels/train"
 all_imgs = sorted([f for f in os.listdir(img_dir) if f.lower().endswith(('.jpg','.jpeg','.png','.bmp'))])
 print(f"Images: {len(all_imgs)}")
 
@@ -337,7 +337,7 @@ def setup_opt(ep):
         return torch.optim.AdamW(teacher.parameters(), lr=1e-4, weight_decay=5e-4)
 
 # ---- Train ----
-SDIR = Path(f"{BASE}/runs/teacher_v4/weights")
+SDIR = Path(os.path.join(TEACHER_DIR, "weights"))
 SDIR.mkdir(parents=True, exist_ok=True)
 best_l, st_ep = float("inf"), 0
 if (SDIR/"state.pt").exists():

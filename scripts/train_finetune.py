@@ -5,10 +5,10 @@
 from ultralytics import YOLO
 import os
 
-BASE = "/root/autodl-tmp"
-DATA_YAML = f"{BASE}/split_dataset/dataset.yaml"
-DISTILL_BEST = f"{BASE}/runs/distill_v4/weights/best.pt"
-PROJECT = f"{BASE}/runs"
+import sys; sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); from config import *; BASE = HOME
+DATA_YAML = DATASET_YAML
+DISTILL_BEST = os.path.join(DISTILL_DIR, "weights", "best.pt")
+PROJECT = RUNS_DIR
 EXPERIMENT = "finetune_v4"
 
 print("=" * 50)
@@ -21,7 +21,7 @@ if not os.path.exists(DISTILL_BEST):
     print(f"WARNING: {DISTILL_BEST} not found!")
     print("Looking for alternative distill model...")
     import glob
-    candidates = glob.glob(f"{BASE}/runs/distill*/weights/best.pt")
+    candidates = glob.glob(os.path.join(RUNS_DIR, "distill*", "weights", "best.pt"))
     if candidates:
         DISTILL_BEST = sorted(candidates)[-1]
         print(f"  Using: {DISTILL_BEST}")
@@ -63,3 +63,4 @@ print("\nValidating on test set...")
 metrics = model.val(data=DATA_YAML, split="test")
 print(f"Test mAP50: {metrics.box.map50:.4f}")
 print(f"Test mAP50-95: {metrics.box.map:.4f}")
+

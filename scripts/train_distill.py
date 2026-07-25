@@ -9,10 +9,10 @@ from pathlib import Path
 from ultralytics import YOLO
 
 # ===== CONFIG =====
-BASE = "/root/autodl-tmp"
-DATA_YAML = f"{BASE}/split_dataset/dataset.yaml"
-TEACHER_SIGNALS_DIR = f"{BASE}/features/teacher_signals"
-PROJECT = f"{BASE}/runs"
+import sys; sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); from config import *; BASE = HOME
+DATA_YAML = DATASET_YAML
+TEACHER_SIGNALS_DIR = FEATURES_DIR
+PROJECT = RUNS_DIR
 EXPERIMENT = "distill_v4"
 EPOCHS = 50
 BATCH = 16
@@ -51,7 +51,7 @@ print(f"  cls_logits: {sample['cls_logits'].shape}")
 
 # ===== Load YOLO11m =====
 print("\n[2/4] Loading YOLO11m...")
-model = YOLO(f"{BASE}/yolo11m.pt")
+model = YOLO(YOLO11M_PT)
 device = next(model.model.parameters()).device
 yolo_model = model.model
 

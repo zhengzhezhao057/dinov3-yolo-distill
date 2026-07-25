@@ -8,8 +8,8 @@ import cv2, yaml
 from pathlib import Path
 from tqdm import tqdm
 
-BASE = "/root/autodl-tmp"
-sys.path.insert(0, f"{BASE}/dinov3_repo")
+import sys; sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); from config import *; BASE = HOME
+sys.path.insert(0, DINOV3_REPO)
 from dinov3.models.vision_transformer import DinoVisionTransformer
 
 DEVICE = "cuda"
@@ -31,7 +31,7 @@ vit = DinoVisionTransformer(img_size=IMGSZ, patch_size=PATCH_SIZE, in_chans=3,
     drop_path_rate=0.0, layerscale_init=1e-5, norm_layer="layernormbf16",
     ffn_layer="mlp", ffn_bias=True, proj_bias=True, n_storage_tokens=4,
     mask_k_bias=True, untie_global_and_local_cls_norm=True)
-sd = torch.load(f"{BASE}/dinov3_vitl16_pretrain_sat493m-eadcf0ff.pth", map_location="cpu", weights_only=True)
+sd = torch.load(VIT_WEIGHTS, map_location="cpu", weights_only=True)
 vit.load_state_dict(sd, strict=True); del sd
 print(f"  ViT-L: {sum(p.numel() for p in vit.parameters())/1e6:.1f}M params")
 
@@ -109,7 +109,7 @@ class ExtractTeacher(nn.Module):
 teacher = ExtractTeacher().to(DEVICE)
 
 # ---- Load trained weights ----
-TEACHER_PT = f"{BASE}/runs/teacher_v4/weights/best.pt"
+TEACHER_PT = os.path.join(TEACHER_DIR, "weights", "best.pt")
 if not os.path.exists(TEACHER_PT):
     print(f"ERROR: {TEACHER_PT} not found!")
     sys.exit(1)
@@ -128,13 +128,13 @@ print(f"Teacher loaded from {TEACHER_PT}")
 print(f"Params: {sum(p.numel() for p in teacher.parameters())/1e6:.1f}M")
 
 # ---- Extract ----
-with open(f"{BASE}/split_dataset/dataset.yaml") as f:
+with open(DATASET_YAML) as f:
     cfg = yaml.safe_load(f)
-img_dir = cfg["path"] + "/images/train"
+img_dir = cfg.get("path", DATASET_DIR) + "/images/train"
 all_imgs = sorted([f for f in os.listdir(img_dir) if f.lower().endswith(('.jpg','.jpeg','.png','.bmp'))])
 print(f"Images: {len(all_imgs)}")
 
-OUT_DIR = Path(f"{BASE}/features/teacher_signals")
+OUT_DIR = Path(FEATURES_DIR)
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 BATCH = 16
 
