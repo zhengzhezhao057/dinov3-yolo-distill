@@ -152,6 +152,14 @@ Default: the repo directory itself.
 
 ## FAQ
 
+- **DINOv3 weights blocked in China?**
+  1. Download locally with VPN/Proxy, then SCP to server
+  2. Keep the 1.2GB file locally for reuse on future servers
+- **HuggingFace download fails?** Login to huggingface.co, request access, or SCP upload from local
+- **OOM?** Reduce `BATCH` in config.py, increase `ACCUM` to keep effective batch=32
+- **`No module named 'dinov3'`?** Ensure `dinov3_repo/` is cloned in the right place
+- **Multi-server migration?** Clone repo, upload `weights/` and `data/`, done
+
 - **HuggingFace download fails?** Login to huggingface.co, request access, or SCP upload from local
 - **OOM?** Reduce `BATCH` in config.py, increase `ACCUM` to keep effective batch=32
 - **`No module named 'dinov3'`?** Ensure `dinov3_repo/` is cloned in the right place
