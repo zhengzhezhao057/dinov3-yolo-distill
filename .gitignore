@@ -1,26 +1,13 @@
-﻿# Weights
-*.pth
+﻿*.pth
 *.pt
-!yolo11m.pt
-
-# Dataset
 split_dataset/
-datasets/
 data/
-
-# Runs
+datasets/
 runs/
 features/
-
-# Python
 __pycache__/
 *.pyc
 .venv/
-
-# IDE
 .vscode/
 .idea/
-
-# OS
-.DS_Store
-Thumbs.db
+*.log

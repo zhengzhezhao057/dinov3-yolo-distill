@@ -1,158 +1,141 @@
 ﻿# DINOv3 → YOLO11m Knowledge Distillation
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
-[![PyTorch 2.1+](https://img.shields.io/badge/pytorch-2.1+-ee4c2c.svg)](https://pytorch.org/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+Distill DINOv3 ViT-L visual features into YOLO11m for fine-grained remote sensing object detection.
 
-Distill DINOv3 ViT-L's remote sensing feature representations into YOLO11m for fine-grained aircraft/vehicle detection (25 classes).
-
-## Overview
-
-```
-DINOv3 ViT-L (Teacher)          YOLO11m (Student)
-      │                              │
-  ViTBackbone                    YOLO Backbone
-      │                              │
-  LightFPN Neck          ←MSE→   YOLO Neck
-      │                              │
-  PredHead + ClsHead      ←KD→   YOLO Head
-      │                              │
-  Detection Loss          + distill loss
-```
-
-**3 training stages:**
-
-| Stage | Script | Epochs | Output |
-|-------|--------|--------|--------|
-| Teacher Training | `train_teacher.py` | 100 | Teacher model weights |
-| Distillation | `train_distill.py` | 50 | Distilled YOLO11m |
-| Fine-tune | `train_finetune.py` | 10 | Final model |
+**GPU**: RTX 3090/4090 24GB | **PyTorch**: 2.1+ | **CUDA**: 11.8+
 
 ## Quick Start
 
-### Prerequisites
-
-- GPU: RTX 3090/4090 with 24GB VRAM
-- PyTorch 2.1+, CUDA 11.8+
-- Ubuntu 22.04 (recommended)
-
-### Installation
+### 1. Clone & Install
 
 ```bash
-# 1. Clone this repo
-git clone https://github.com/YOUR_USERNAME/dinov3-yolo-distill.git
+git clone https://github.com/zhengzhezhao057/dinov3-yolo-distill.git
 cd dinov3-yolo-distill
-
-# 2. Install dependencies
 pip install -r requirements.txt
-
-# 3. Download DINOv3 weights (~1.2GB)
-# Option A: from HuggingFace
-huggingface-cli download facebook/dinov3-vitl16-pretrain-sat493m --local-dir ./weights
-
-# Option B: from HF mirror (China)
-wget https://hf-mirror.com/facebook/dinov3-vitl16-pretrain-lvd1689m/resolve/main/dinov3_vitl16_pretrain_sat493m-eadcf0ff.pth -P ./weights
-
-# 4. Download DINOv3 source
-git clone https://github.com/facebookresearch/dinov3.git
-
-# 5. Download YOLO11m
-wget https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11m.pt
 ```
 
-### Dataset Preparation
+### 2. Download Dependencies
 
-Organize your dataset in YOLO format:
+```bash
+# DINOv3 source
+git clone https://github.com/facebookresearch/dinov3.git /root/autodl-tmp/dinov3_repo
+
+# ViT-L weights (1.2GB)
+# Option A: HuggingFace
+huggingface-cli download facebook/dinov3-vitl16-pretrain-sat493m --local-dir /root/autodl-tmp
+# Option B: HF mirror (China)
+wget https://hf-mirror.com/facebook/dinov3-vitl16-pretrain-sat493m/resolve/main/dinov3_vitl16_pretrain_sat493m-eadcf0ff.pth -P /root/autodl-tmp
+
+# YOLO11m base model (40MB)
+wget https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11m.pt -P /root/autodl-tmp
+```
+
+### 3. Prepare Dataset
 
 ```
-data/
-├── dataset.yaml
-├── images/
-│   ├── train/    # training images
-│   ├── val/      # validation images
-│   └── test/     # test images
-└── labels/
-    ├── train/    # YOLO format labels (.txt)
-    ├── val/
-    └── test/
+/root/autodl-tmp/split_dataset/
+├── dataset.yaml          # path: /root/autodl-tmp/split_dataset
+├── images/train/         # training images
+├── images/val/           # validation images
+├── images/test/          # test images
+└── labels/train/val/test # YOLO format .txt files
 ```
 
 `dataset.yaml`:
 ```yaml
-path: /path/to/data
+path: /root/autodl-tmp/split_dataset
 train: images/train
 val: images/val
 test: images/test
-names: ["class_0", "class_1", ...]
+names: ["HM","LQS","QHS","MS",...]  # 25 classes
 nc: 25
 ```
 
-### Training
+### 4. Verify Setup
 
 ```bash
-# Stage 1: Train teacher (100 epochs, ~10 hours)
+python scripts/verify.py
+```
+
+### 5. Train
+
+```bash
+# Stage 1: Teacher Training (100 epochs, ~10h)
 python scripts/train_teacher.py
 
-# Stage 2: Distill to YOLO11m (50 epochs, ~4 hours)
+# Stage 2: Extract Teacher Signals (~20min)
+python scripts/extract_signals.py
+
+# Stage 3: Distillation (50 epochs, ~4h)
 python scripts/train_distill.py
 
-# Stage 3: Fine-tune (10 epochs, ~1 hour)
+# Stage 4: Fine-tune (10 epochs, ~1h)
 python scripts/train_finetune.py
 ```
 
+> Use `nohup python script.py > log.txt 2>&1 &` for long runs.
+
 ## Architecture
 
-### Teacher Model
 ```
-DINOv3 ViT-L/16 (303M, frozen in early stages)
-  → ViTBackbone (multi-scale projection)
-  → LightFPN (top-down fusion)
-  → PredHead (detection) + ClassifierHead (25-class logits)
-```
-
-### Key Innovations
-- **Self-contained**: Zero dependency on ultralytics internals for teacher training
-- **3-phase freeze schedule**: Gradual ViT unfreezing for stable convergence
-- **EMA**: Exponential moving average (decay=0.9995) for all stages
-- **Multi-scale training**: Random input size [480-800] for robustness
-- **Cosine Warm Restarts**: T₀=20, T_mult=2 for better exploration
-- **Progressive distillation weights**: Feature (0.5→0.1), Classification (0.3→0.7)
-
-### Distillation Loss
-```
-L_total = L_det + α(t)·L_feat_mse + β(t)·L_cls_kd + γ·L_box_smoothl1
-
-α(t): 0.5 → 0.1  (feature alignment, dominant early)
-β(t): 0.3 → 0.7  (classification KD, dominant late)
-γ: 0.2 (constant)
+Teacher (DINOv3 ViT-L)              Student (YOLO11m)
+┌──────────────────────┐           ┌─────────────────┐
+│ ViT-L/16 (303M)      │           │ YOLO Backbone   │
+│ hooks: [5,11,17,23]  │           │      ↓          │
+│        ↓             │   MSE     │ YOLO Neck       │
+│ ViTBackbone          │←────────→│      ↓          │
+│        ↓             │  feature  │ YOLO Head       │
+│ LightFPN             │           │      ↓          │
+│    ↓         ↓       │   KL      │ Detection Loss  │
+│ PredHead  ClsHead    │←────────→│    + distill    │
+│    ↓         ↓       │  logits   │                 │
+│ Detection  Soft      │           │                 │
+│   Loss    Labels     │           │                 │
+└──────────────────────┘           └─────────────────┘
 ```
 
-## Expected Results
+## Key Features
 
-| Metric | Baseline (YOLO11m) | After Distillation |
-|--------|-------------------|--------------------|
+- **Self-contained**: Zero dependency on ultralytics internals for teacher
+- **3-phase freeze**: Stable ViT unfreezing (frozen → partial → full)
+- **EMA**: Exponential moving average (decay 0.9995)
+- **Multi-scale**: Random input [480-800] for robustness
+- **Cosine Warm Restarts**: T_0=20, T_mult=2
+- **Progressive distillation**: Feature weight 0.5→0.1, CLS weight 0.3→0.7
+
+## Distillation Loss
+
+```
+L = L_det + a(t)*MSE(feat_stu, feat_tch) + b(t)*KL(logits_stu, logits_tch)
+
+a(t): 0.5 → 0.1 (feature alignment)
+b(t): 0.3 → 0.7 (classification KD)
+KL temperature: T=3.0
+```
+
+## Expected Results (25-class remote sensing)
+
+| Metric | YOLO11m | +Distillation |
+|--------|---------|---------------|
 | mAP50 | 0.965 | 0.972-0.978 |
 | mAP50-95 | 0.780 | 0.795-0.808 |
-| Small objects (FSC) | 0.525 | 0.55-0.60 |
 
-## Citation
+## File Structure
 
-```bibtex
-@misc{dinov3-yolo-distill,
-  author = {YOUR_NAME},
-  title = {DINOv3 → YOLO11m Knowledge Distillation for Remote Sensing},
-  year = {2026},
-  publisher = {GitHub},
-  url = {https://github.com/YOUR_USERNAME/dinov3-yolo-distill}
-}
+```
+dinov3-yolo-distill/
+├── scripts/
+│   ├── verify.py           # Environment check
+│   ├── train_teacher.py    # Stage 1: Teacher training
+│   ├── extract_signals.py  # Stage 2: Signal extraction
+│   ├── train_distill.py    # Stage 3: Distillation
+│   └── train_finetune.py   # Stage 4: Fine-tune
+├── requirements.txt
+├── .gitignore
+├── LICENSE
+└── README.md
 ```
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
-
-## Acknowledgments
-
-- [DINOv3](https://github.com/facebookresearch/dinov3) - Meta AI
-- [Ultralytics YOLO11](https://github.com/ultralytics/ultralytics)
-- DINOv3 weights: `facebook/dinov3-vitl16-pretrain-sat493m`
+MIT. See [LICENSE](LICENSE).
