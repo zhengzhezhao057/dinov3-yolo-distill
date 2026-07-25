@@ -1,6 +1,6 @@
-# DINOv3 -> YOLO11m Knowledge Distillation (25-Class Remote Sensing)
+# DINOv3 ViT-L -> YOLO11m Distillation (25-Class) (25-Class Remote Sensing)
 
-Distill DINOv3 ViT-L into YOLO11m for fine-grained military aircraft detection.
+Distill DINOv3 **ViT-L** into **YOLO11m** for fine-grained military aircraft detection.
 
 **GPU**: RTX 3090/4090 24GB | **PyTorch**: 2.1+ | **Python**: 3.10+
 
