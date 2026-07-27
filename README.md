@@ -36,20 +36,25 @@ git clone --depth 1 https://github.com/facebookresearch/dinov3.git dinov3_repo
 
 ### 3. Download Weights
 
+**Auto-download (recommended):** Just run any script - weights are downloaded automatically:
+
+```bash
+python scripts/verify.py   # auto-downloads ViT-L (1.2GB) + YOLO11m (40MB)
+```
+
+**Manual (if auto-download fails in China):**
+
 ```bash
 mkdir -p weights
 
 # YOLO11m (40MB)
 wget -O weights/yolo11m.pt https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11m.pt
 
-# DINOv3 ViT-L (1.2GB) - requires HuggingFace login + access approval
+# ViT-L from HuggingFace mirror (1.2GB)
+export HF_ENDPOINT=https://hf-mirror.com
 pip install huggingface_hub -q
-hf download facebook/dinov3-vitl16-pretrain-sat493m --local-dir weights/
-```
-
-> If HuggingFace fails, upload manually: `scp -P <port> <local.pth> root@<ip>:/root/dinov3-yolo-distill/weights/`
-
-### 4. Prepare Dataset
+hf download zzz0917/dinov3-yolo-distill-weights --local-dir weights/
+```### 4. Prepare Dataset
 
 Directory structure:
 ```

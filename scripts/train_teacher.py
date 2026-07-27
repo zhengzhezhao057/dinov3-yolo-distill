@@ -1,4 +1,4 @@
-﻿# train_teacher_v4_custom.py - DINOv3 ViT-L Teacher Training
+# train_teacher_v4_custom.py - DINOv3 ViT-L Teacher Training
 # Self-contained, ZERO ultralytics internals
 # Server: RTX 3090 24GB, PT 2.9.1, CUDA 12.9
 
@@ -9,6 +9,7 @@ from pathlib import Path
 from tqdm import tqdm
 
 import sys; sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); from config import *
+config.ensure_weights()
 sys.path.insert(0, DINOV3_REPO)
 from dinov3.models.vision_transformer import DinoVisionTransformer
 

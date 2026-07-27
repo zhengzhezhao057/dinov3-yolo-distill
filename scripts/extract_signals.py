@@ -1,4 +1,4 @@
-﻿# extract_teacher_signals.py - Pre-compute teacher outputs for distillation
+# extract_teacher_signals.py - Pre-compute teacher outputs for distillation
 # Must match train_teacher_v4_custom.py architecture EXACTLY
 # Server: RTX 3090 24GB, PT 2.9.1, CUDA 12.9
 
@@ -8,7 +8,8 @@ import cv2, yaml
 from pathlib import Path
 from tqdm import tqdm
 
-import sys; sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); from config import *; BASE = HOME
+import sys; sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); from config import *
+config.ensure_weights(); BASE = HOME
 sys.path.insert(0, DINOV3_REPO)
 from dinov3.models.vision_transformer import DinoVisionTransformer
 
