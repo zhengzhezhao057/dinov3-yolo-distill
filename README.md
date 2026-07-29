@@ -196,3 +196,50 @@ dinov3-yolo-distill/
 ## License
 
 MIT
+---
+
+## 🔮 推理 (Inference)
+
+### 环境要求
+
+```bash
+conda activate yolo11          # 或其他有 torch+cuda+ultralytics 的环境
+pip install ultralytics opencv-python
+```
+
+### 导出 TensorRT（可选，快 2-3x）
+
+```bash
+yolo export model=best.pt format=engine half=True device=0
+# 生成 best.engine，约 42MB
+```
+
+### 使用方法
+
+```bash
+# 单张图片（自动判断小图直接推理 / 大图滑动窗口）
+python predict.py --img 图片.jpg
+
+# 批量处理整个文件夹
+python predict.py --dir 测试集文件夹/
+
+# 调整置信度阈值（默认 0.2）
+python predict.py --img 图片.jpg --conf 0.3
+
+# 大图专用脚本（纯滑动窗口）
+python large_inference.py --img 大图.jpg
+```
+
+### 性能参考
+
+| 图片大小 | 模式 | 耗时 | 硬件 |
+|---------|------|------|------|
+| 640×640 | 直接推理 | <0.1s | RTX 4060 Laptop |
+| 10000×10000 | sliding window + TensorRT | ~8s | RTX 4060 Laptop |
+| 10000×10000 | sliding window + PyTorch | ~19s | RTX 4060 Laptop |
+
+### 工作原理
+
+- 小图（最长边 ≤ 2048px）：直接全图推理，不切块
+- 大图（最长边 > 2048px）：640×640 滑动窗口，stride=480，自动 NMS 合并
+- 优先使用 `best.engine`（TensorRT FP16），不存在则回退 `best.pt`（PyTorch）
