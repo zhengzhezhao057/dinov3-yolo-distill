@@ -11,7 +11,7 @@ PT_PATH = r"E:/deeplearning/yolo11m+dinov3/best.pt"
 
 MAX_DIRECT_SIZE = 2048   # Images <= 2048px: direct inference
 WINDOW = 640
-STRIDE = 480
+STRIDE = 320
 CONF = 0.2
 
 def get_model():
